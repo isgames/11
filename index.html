@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Game - Classroom4x</title>
+
+<!-- 👇 აქ არის ჩასმული სარეკლამო სკრიპტი -->
+<link rel="dns-prefetch" href="https://universal.wgplayer.com"/>
+<script type="text/javascript" async>!function(e,t){a=e.createElement("script"),m=e.getElementsByTagName("script")[0],a.async=1,a.src=t,a.fetchPriority='high',m.parentNode.insertBefore(a,m)}(document,"https://universal.wgplayer.com/tag/?lh="+window.location.hostname+"&wp="+window.location.pathname+"&ws="+window.location.search);</script>
+
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  background: #ffd84d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+.container {
+  text-align: center;
+}
+
+.btn {
+  width: 320px;
+  max-width: 90%;
+  padding: 18px;
+  border-radius: 20px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  margin: 15px 0;
+}
+
+.play-btn {
+  background: linear-gradient(45deg,#5f3bff,#7a5cff);
+  color: white;
+}
+
+.secondary-btn {
+  background: #fff3b0;
+  color: #5f3bff;
+}
+
+/* GAME CANVAS & LOADER STYLES */
+#game-container {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #0d0606;
+  z-index: 100;
+}
+
+#unity-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  background: #231f20;
+  display: block;
+}
+
+#game-loader {
+  position: absolute;
+  inset: 0;
+  background: #0d0606;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.site-brand {
+  color: #ff3333;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
+}
+
+.loader-status {
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.loader-bar {
+  width: 220px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+.loader-progress {
+  width: 5%;
+  height: 100%;
+  background: linear-gradient(90deg, #8b0000, #ff0000);
+  border-radius: 10px;
+  transition: width 0.2s linear;
+}
+
+/* ზედა მარჯვენა კუთხის ფულსქრინის ღილაკი */
+.fullscreen-corner-btn {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  z-index: 1000;
+  font-size: 14px;
+  font-weight: bold;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s ease;
+  display: none; /* ჩანს მხოლოდ მაშინ როცა თამაში ირთვება */
+}
+
+.fullscreen-corner-btn:hover {
+  background: rgba(255, 0, 0, 0.8);
+  border-color: #ff0000;
+}
+
+@media (max-width: 768px) {
+  .btn {
+    font-size: 16px;
+    padding: 16px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- მთავარი მენიუ -->
+<div class="container" id="menu">
+  <button class="btn play-btn" onclick="startPlay()">PLAY HERE</button>
+  <br>
+  <button class="btn secondary-btn" onclick="goTrending()">DISCOVER CLASSROOM 4X</button>
+</div>
+
+<!-- თამაშის კონტეინერი -->
+<div id="game-container">
+  <button class="fullscreen-corner-btn" id="fs-btn" onclick="openBlankFullscreenTab()">⛶ Fullscreen</button>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="game-loader">
+    <div class="site-brand">Classroom80x.com</div>
+    <div class="loader-status" id="loader-status">Connecting...</div>
+    <div class="loader-bar">
+      <div class="loader-progress" id="loader-progress"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dataParts = [
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/1059d0685eac1361aede2ff1cf737043.data.part1",
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/1059d0685eac1361aede2ff1cf737043.data.part2",
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/1059d0685eac1361aede2ff1cf737043.data.part3"
+  ];
+
+  const wasmParts = [
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/8fe56d41e9083c1a754ad6e6873d3f9d.wasm.part1",
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/8fe56d41e9083c1a754ad6e6873d3f9d.wasm.part2",
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/8fe56d41e9083c1a754ad6e6873d3f9d.wasm.part3",
+    "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/8fe56d41e9083c1a754ad6e6873d3f9d.wasm.part4"
+  ];
+
+  const loaderUrl = "https://cdn.jsdelivr.net/gh/classroom-4x/games2@main/CrazyGames.loader.js";
+  const frameworkUrl = "https://cdn.jsdelivr.net/gh/classroom-4x/wasma@main/926cb52be13c9dba81e02201541f8a72.framework.js";
+
+  async function fetchAndMergeParts(parts, basePercent, rangePercent, mimeType, statusMsg) {
+    const progressBar = document.getElementById("loader-progress");
+    const statusText = document.getElementById("loader-status");
+    const buffers = [];
+    
+    for (let i = 0; i < parts.length; i++) {
+      statusText.innerText = `${statusMsg} (${i + 1}/${parts.length})`;
+      const response = await fetch(parts[i]);
+      if (!response.ok) throw new Error("ვერ მოხერხდა ფაილის გადმოწერა: " + parts[i]);
+      const buf = await response.arrayBuffer();
+      buffers.push(buf);
+      let currentProg = basePercent + ((i + 1) / parts.length) * rangePercent;
+      progressBar.style.width = currentProg + '%';
+    }
+    const totalLength = buffers.reduce((acc, curr) => acc + curr.byteLength, 0);
+    const mergedArray = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const buf of buffers) {
+      mergedArray.set(new Uint8Array(buf), offset);
+      offset += buf.byteLength;
+    }
+    return new Blob([mergedArray], { type: mimeType });
+  }
+
+  async function startPlay() {
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("game-container").style.display = "block";
+
+    const progressBar = document.getElementById("loader-progress");
+    const statusText = document.getElementById("loader-status");
+    const canvas = document.getElementById("unity-canvas");
+    const loader = document.getElementById("game-loader");
+
+    try {
+      statusText.innerText = "Connecting to server...";
+      progressBar.style.width = "5%";
+
+      const dataBlob = await fetchAndMergeParts(dataParts, 5, 35, "application/octet-stream", "Downloading Game Data");
+      const wasmBlob = await fetchAndMergeParts(wasmParts, 40, 35, "application/wasm", "Downloading Engine Wasm");
+
+      statusText.innerText = "Initializing Unity Engine...";
+      progressBar.style.width = "80%";
+
+      const dataUrl = URL.createObjectURL(dataBlob);
+      const wasmUrl = URL.createObjectURL(wasmBlob);
+
+      var config = {
+        dataUrl: dataUrl,
+        frameworkUrl: frameworkUrl,
+        codeUrl: wasmUrl,
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Game",
+        productVersion: "1.0",
+      };
+
+      config.matchWebGLToCanvasSize = true;
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBar.style.width = (80 + progress * 20) + "%";
+          statusText.innerText = `Loading Game: ${Math.round(progress * 100)}%`;
+        }).then((unityInstance) => {
+          progressBar.style.width = "100%";
+          statusText.innerText = "Ready!";
+          setTimeout(() => {
+            loader.style.display = 'none';
+            document.getElementById("fs-btn").style.display = "block";
+          }, 400);
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+
+      document.body.appendChild(script);
+
+    } catch (err) {
+      console.error(err);
+      alert("შეცდომა თამაშის ჩატვირთვისას: " + err.message);
+    }
+  }
+
+  function openBlankFullscreenTab() {
+    const win = window.open("about:blank", "_blank");
+    
+    win.document.write(
+      '<!DOCTYPE html>' +
+      '<html lang="en">' +
+      '<head>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<title>Game - Fullscreen</title>' +
+      '<style>' +
+      'html, body { margin: 0; height: 100%; background: #0d0606; overflow: hidden; }' +
+      '#unity-canvas { width: 100% !important; height: 100% !important; background: #231f20; display: block; }' +
+      '</style>' +
+      '</head>' +
+      '<body>' +
+      '<canvas id="unity-canvas" tabindex="-1"></canvas>' +
+      '<script>' +
+      'const dataParts = ' + JSON.stringify(dataParts) + ';' +
+      'const wasmParts = ' + JSON.stringify(wasmParts) + ';' +
+      'const loaderUrl = "' + loaderUrl + '";' +
+      'const frameworkUrl = "' + frameworkUrl + '";' +
+      'const canvas = document.getElementById("unity-canvas");' +
+      'async function fetchAndMergeParts(parts, mimeType) {' +
+      '  const buffers = [];' +
+      '  for (let i = 0; i < parts.length; i++) {' +
+      '    const response = await fetch(parts[i]);' +
+      '    const buf = await response.arrayBuffer();' +
+      '    buffers.push(buf);' +
+      '  }' +
+      '  const totalLength = buffers.reduce((acc, curr) => acc + curr.byteLength, 0);' +
+      '  const mergedArray = new Uint8Array(totalLength);' +
+      '  let offset = 0;' +
+      '  for (const buf of buffers) {' +
+      '    mergedArray.set(new Uint8Array(buf), offset);' +
+      '    offset += buf.byteLength;' +
+      '  }' +
+      '  return new Blob([mergedArray], { type: mimeType });' +
+      '}' +
+      'async function init() {' +
+      '  const dataBlob = await fetchAndMergeParts(dataParts, "application/octet-stream");' +
+      '  const wasmBlob = await fetchAndMergeParts(wasmParts, "application/wasm");' +
+      '  var config = {' +
+      '    dataUrl: URL.createObjectURL(dataBlob),' +
+      '    frameworkUrl: frameworkUrl,' +
+      '    codeUrl: URL.createObjectURL(wasmBlob),' +
+      '    streamingAssetsUrl: "StreamingAssets",' +
+      '    companyName: "DefaultCompany",' +
+      '    productName: "Game",' +
+      '    productVersion: "1.0"' +
+      '  };' +
+      '  var script = document.createElement("script");' +
+      '  script.src = loaderUrl;' +
+      '  script.onload = () => {' +
+      '    createUnityInstance(canvas, config).then(() => {' +
+      '      if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }' +
+      '    });' +
+      '  };' +
+      '  document.body.appendChild(script);' +
+      '}' +
+      'init();' +
+      '<\/script>' +
+      '</body>' +
+      '</html>'
+    );
+    win.document.close();
+  }
+
+  function goTrending() {
+    window.open("https://classroom4x.dev/category/casual-games/", "_blank");
+  }
+</script>
+
+</body>
+</html>
